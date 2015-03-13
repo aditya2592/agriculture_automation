@@ -7,70 +7,98 @@ int val = 0; //this variable will read the value from the sensor
 #define RELAY5  8
 #define RELAY6  9
 
+#define CYCLE_MAX 5  //number of cycles of 4 levels
+
 volatile int pulsecount = 5;
 int ledPin = 3;
 int inputPin = 2; //Pin number 2 for proximity switch
 unsigned int pulse;
-volatile int time_steps = 0;
+int time_steps = 0;
 
 char output[6];
 int count = 0; //to count number of bytes coming in. 6 at a time, one for each camera
+char current[6];
+boolean toggle1 = 0;
+int cycle_count = 0;
 
 void pulse_fun()
- {
-      pulsecount++;
-      digitalWrite(ledPin, HIGH);
-      delay(50);
-      digitalWrite(ledPin, LOW);
- }
+{
+  pulsecount++;
+  digitalWrite(ledPin, HIGH);
+  delay(50);
+  digitalWrite(ledPin, LOW);
+}
 
-boolean toggle1 = 0;
+
+
+
+
 ISR(TIMER1_COMPA_vect){
-  
-    if (toggle1){
-      digitalWrite(13,HIGH);
-      toggle1 = 0;
+
+  if (toggle1){
+    digitalWrite(13,HIGH);
+    toggle1 = 0;
+  }
+  else{
+    digitalWrite(13,LOW);
+    toggle1 = 1;
+  }
+
+  time_steps = time_steps + 1;
+
+
+  for(int i = 0; i < 6; i++)
+  {
+    if(current[i] == '1' && (time_steps % 4) == 1)
+    {
+
+      digitalWrite(i+4,LOW);
     }
-    else{
-      digitalWrite(13,LOW);
-      toggle1 = 1;
+    else if(current[i] == '2'  && (time_steps % 4) == 2)
+    {
+      digitalWrite(i+4,LOW);
     }
- 
-    time_steps = time_steps + 1;
+    else if(current[i] == '3'  && (time_steps % 4) == 3)
+    {
+      digitalWrite(i+4,LOW);
+    }
+
+
+  }
+  if(time_steps == CYCLE_MAX * 4)
+  {
+    //new cyclec will start according to new output
+    time_steps = 0;
     for(int i = 0; i < 6; i++)
+    {
+      current[i] = output[i];
+    }
+    for(int i = 0; i < 6; i++)
+    {
+      if(current[i] != '0')
       {
-        //Serial.write(output[i]);
-        if(output[i] == '1' && time_steps == 1)
-        {
-            
-           digitalWrite(i+4,LOW);
-        }
-        else if(output[i] == '2'  && time_steps == 2)
-        {
-           digitalWrite(i+4,LOW);
-        }
-        else if(output[i] == '3'  && time_steps == 3)
-        {
-           digitalWrite(i+4,LOW);
-        }
-        else if(output[i] == '4'  && time_steps == 4)
-        {
-           digitalWrite(i+4,LOW);
-           
-        }
-        
+        digitalWrite(i+4,HIGH);
       }
-      if(time_steps == 4)
+    }
+    //TCNT1  = 0;
+    //TIMSK1 |= (0 << OCIE1A);
+  }
+  if((time_steps % 4) == 0 && time_steps != CYCLE_MAX * 4)
+  {
+    //repeat same cycle
+    for(int i = 0; i < 6; i++)
+    {
+      if(current[i] != '0')
       {
-        time_steps = 0;
-        TCNT1  = 0;
-        TIMSK1 |= (0 << OCIE1A);
+        digitalWrite(i+4,HIGH);
       }
-  
+    }
+  }
+
 }
 void setup() {                
   Serial.begin(9600);
-  
+
   //pinMode(inputPin, INPUT); //declare infrared sensor as input
   pinMode(ledPin, OUTPUT);
   pinMode(13, OUTPUT);
@@ -81,58 +109,60 @@ void setup() {
   pinMode(RELAY5, OUTPUT);
   pinMode(RELAY6, OUTPUT);
   cli();
-  
-  
+
+
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
   TCNT1  = 0;//initialize counter value to 0
   // set compare match register for 1hz increments
-  OCR1A = 7816;// = (16*10^6) / (2*1024) - 1 (must be <65536)
+  OCR1A = 781;// = (16*10^6) / (2*1024) - 1 (must be <65536) //500ms = 7816
   // turn on CTC mode
   TCCR1B |= (1 << WGM12);
   // Set CS10 and CS12 bits for 1024 prescaler
   TCCR1B |= (1 << CS12) | (1 << CS10);  
   // enable timer compare interrupt
-  //TIMSK1 |= (1 << OCIE1A);
-  
+  TIMSK1 |= (1 << OCIE1A);
+
   sei();//allow interrupts
-  
-  
-  
+
+
+
 }
 
 void loop() 
 {
-  
-  
+
+
   if (Serial.available()) 
   {
     byteRead = Serial.read();
     Serial.write(byteRead);
-    
+
     output[count] = byteRead;
-    
+
     count = count + 1;
-    
+
     if(count == 6)
     {
-        Serial.write("ok\n");
-        for(int i = 0; i < 6; i++)
-        {
-          Serial.write(output[i]);
-          if(output[i] != '0')
-          {
-             int pin = i+4;
-             digitalWrite(pin,HIGH);
-          }
-        }
-        delay(2000);
-        count = 0;
-        TCNT1  = 0;
-        TIMSK1 |= (1 << OCIE1A);
-        
+       Serial.write("\n");
+      /*for(int i = 0; i < 6; i++)
+       {
+       Serial.write(output[i]);
+       if(output[i] != '0')
+       {
+       digitalWrite(i+4,HIGH);
+       }
+       }*/
+
+      count = 0;
+      //TCNT1  = 0;
+      //TIMSK1 |= (1 << OCIE1A);
+
     }
-    
-    
+
+
   }
 }
+
+
+
