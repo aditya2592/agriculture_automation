@@ -9,7 +9,7 @@ int val = 0; //this variable will read the value from the sensor
 
 #define CYCLE_MAX 5  //number of cycles of 4 levels
 
-volatile int pulsecount = 5;
+volatile int pulsecount = 0;
 int ledPin = 3;
 int inputPin = 2; //Pin number 2 for proximity switch
 unsigned int pulse;
@@ -24,9 +24,9 @@ int cycle_count = 0;
 void pulse_fun()
 {
   pulsecount++;
-  digitalWrite(ledPin, HIGH);
-  delay(50);
-  digitalWrite(ledPin, LOW);
+  //digitalWrite(ledPin, HIGH);
+  //delay(50);
+  //digitalWrite(ledPin, LOW);
 }
 
 
@@ -49,19 +49,26 @@ ISR(TIMER1_COMPA_vect){
 
   for(int i = 0; i < 6; i++)
   {
-    if(current[i] == '1' && (time_steps % 4) == 1)
-    {
-
-      digitalWrite(i+4,LOW);
-    }
-    else if(current[i] == '2'  && (time_steps % 4) == 2)
-    {
-      digitalWrite(i+4,LOW);
-    }
-    else if(current[i] == '3'  && (time_steps % 4) == 3)
-    {
-      digitalWrite(i+4,LOW);
-    }
+   
+      if(current[i] == '0' )
+      {
+  
+        digitalWrite(i+4,LOW);
+      }
+      else if(current[i] == '1' && (time_steps % 4) == 1)
+      {
+  
+        digitalWrite(i+4,LOW);
+      }
+      else if(current[i] == '2'  && (time_steps % 4) == 2)
+      {
+        digitalWrite(i+4,LOW);
+      }
+      else if(current[i] == '3'  && (time_steps % 4) == 3)
+      {
+        digitalWrite(i+4,LOW);
+      }
+    
 
 
   }
@@ -69,16 +76,28 @@ ISR(TIMER1_COMPA_vect){
   {
     //new cyclec will start according to new output
     time_steps = 0;
-    for(int i = 0; i < 6; i++)
+    if(pulsecount > 5)
     {
-      current[i] = output[i];
-    }
-    for(int i = 0; i < 6; i++)
-    {
-      if(current[i] != '0')
+      for(int i = 0; i < 6; i++)
       {
-        digitalWrite(i+4,HIGH);
+        current[i] = output[i];
       }
+      for(int i = 0; i < 6; i++)
+      {
+        if(current[i] != '0')
+        {
+          digitalWrite(i+4,HIGH);
+        }
+      }
+      pulsecount = 0;
+    }
+    else
+    {
+      for(int i = 0; i < 6; i++)
+      {
+        current[i] = '0';
+      }
+      
     }
     //TCNT1  = 0;
     //TIMSK1 |= (0 << OCIE1A);
@@ -123,7 +142,20 @@ void setup() {
   // enable timer compare interrupt
   TIMSK1 |= (1 << OCIE1A);
 
+ 
+  
   sei();//allow interrupts
+  
+  attachInterrupt(0, pulse_fun, FALLING);
+  
+  for(int i = 0; i < 6; i++)
+    { 
+        digitalWrite(i+4,LOW);
+        current[i] = '0';
+        output[i] = '0';      
+    }
+  
+  
 
 
 
